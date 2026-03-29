@@ -86,6 +86,7 @@ namespace VF.Component
             public float exitSmoothingSeconds = 2f;
             public bool useExitAnimation = false;
             public State exitActionSet = new State();
+            public float exitAnimFadeSeconds = 0.5f;  // NEW
             public bool reverseClip = false;
         }
 
