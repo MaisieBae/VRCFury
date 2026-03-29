@@ -74,6 +74,23 @@ namespace VF.Component
             Local
         }
 
+        /// <summary>
+        /// Serialized data for a single depth animation entry on a Haptic Socket.
+        /// 
+        /// FORK ADDITIONS (vs upstream VRCFury/VRCFury):
+        ///   - useExitSmoothing:      Enables the dual-smoother (fast + slow) system.
+        ///                            When true, the main "smoothed" value is Max(fast, slow),
+        ///                            so the socket closes slowly even after the plug leaves.
+        ///   - exitSmoothingSeconds:  Decay time for the slow smoother. Controls how long the
+        ///                            socket takes to fully close after plug exit.
+        ///   - useExitAnimation:      When true, a separate Exit animator layer is generated
+        ///                            that plays exitActionSet during plug withdrawal.
+        ///   - exitActionSet:         The animation clip/state to play as the plug exits.
+        ///                            Driven by exitAnimValue = Map(smoothedFast, 1->0, 0->1),
+        ///                            so 0 = fully inside, 1 = at socket entrance.
+        ///   - exitAnimFadeSeconds:   Blend-out duration (in seconds) for the exit animation
+        ///                            transition back to Off once smoothedFast < 0.005.
+        /// </summary>
         [Serializable]
         public class DepthActionNew
         {
@@ -82,11 +99,22 @@ namespace VF.Component
             public DepthActionUnits units = DepthActionUnits.Meters;
             public bool enableSelf;
             public float smoothingSeconds = 0;
+
+            // FORK: Enables dual-smoother exit system. When false, behavior is identical to upstream.
             public bool useExitSmoothing = false;
+
+            // FORK: Decay speed for the slow smoother. A value around 2.0 seconds works well.
             public float exitSmoothingSeconds = 2f;
+
+            // FORK: When true, a dedicated Exit animator layer is generated using exitActionSet.
             public bool useExitAnimation = false;
+
+            // FORK: The animation to play as the plug withdraws from the socket.
             public State exitActionSet = new State();
-            public float exitAnimFadeSeconds = 0.5f;  // NEW
+
+            // FORK: How long the exit animation blends back to zero after the plug has fully left.
+            public float exitAnimFadeSeconds = 0.5f;
+
             public bool reverseClip = false;
         }
 
