@@ -1,3 +1,11 @@
+// FORK NOTE (vs upstream VRCFury/VRCFury):
+// This file has been modified to:
+//   1. Expose the new Exit Animation UI fields inside DepthActionDrawer.
+//   2. Simplify the haptics section in CreateEditor (removed OGB/OSC ID field and SpsEditorUtils.AutoHapticIdProp).
+//   3. Move the socket name field to the top of the inspector unconditionally.
+//   4. Use a local GetName() helper instead of upstream's GetMenuName() in gizmos and ShouldProbablyHaveTouchZone.
+// See FORK_CHANGES.md for a full explanation.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,6 +34,8 @@ namespace VF.Inspector
 
             container.Add(VRCFuryHapticPlugEditor.ConstraintWarning(target, true));
 
+            // FORK: Name field moved here unconditionally (upstream places it inside the menu toggle section
+            // and uses SpsEditorUtils.AutoHapticIdProp with disambiguation logic).
             container.Add(VRCFuryEditorUtils.BetterProp(serializedObject.FindProperty("name"), "Name in menu / connected apps"));
 
             var addLightProp = serializedObject.FindProperty("addLight");
@@ -62,6 +72,8 @@ namespace VF.Inspector
             container.Add(VRCFuryEditorUtils.RefreshOnChange(() => {
                 if (!addMenuItemProp.boolValue) return new VisualElement();
                 var toggles = VRCFuryEditorUtils.Section("Menu Toggle", "A menu item will be created for this socket");
+                // FORK: Upstream shows SpsEditorUtils.AutoHapticIdProp name field here.
+                // This fork omits it since name is shown unconditionally at the top.
                 toggles.Add(VRCFuryEditorUtils.BetterProp(serializedObject.FindProperty("enableAuto"), "Include in Auto selection?", tooltip: "If checked, this socket will be eligible to be chosen during 'Auto Mode', which is an option in your menu which will automatically enable the socket nearest to a plug."));
                 toggles.Add(VRCFuryEditorUtils.BetterProp(serializedObject.FindProperty("menuIcon"), "Menu Icon", tooltip: "Override the menu icon used for this socket's individual toggle. Looking to move or change the icon of the main SPS menu? Add a VRCFury 'SPS Options' component to the avatar root."));
                 return toggles;
@@ -84,6 +96,9 @@ namespace VF.Inspector
                 VRCFuryEditorUtils.BetterProp(serializedObject.FindProperty("activeActions"))
             ));
 
+            // FORK: Uses GetHapticsSection() instead of GetOgbHapticsSection().
+            // Upstream also adds an OGB/OSC ID field here via SpsEditorUtils.AutoHapticIdProp.
+            // This fork omits the OSC ID field for simplicity.
             var haptics = VRCFuryHapticPlugEditor.GetHapticsSection();
             container.Add(haptics);
             haptics.Add(VRCFuryEditorUtils.BetterProp(
@@ -120,6 +135,11 @@ namespace VF.Inspector
             return container;
         }
 
+        /// <summary>
+        /// Custom property drawer for DepthActionNew.
+        /// FORK: Extended with exit smoothing and exit animation UI fields.
+        /// Upstream only has: actionSet, range slider, units, enableSelf, smoothingSeconds, reverseClip.
+        /// </summary>
         [CustomPropertyDrawer(typeof(VRCFuryHapticSocket.DepthActionNew))]
         public class DepthActionDrawer : PropertyDrawer
         {
@@ -141,31 +161,41 @@ namespace VF.Inspector
                 c.Add(VRCFuryEditorUtils.BetterProp(prop.FindPropertyRelative("enableSelf"), "Allow avatar to trigger its own animation?"));
                 c.Add(VRCFuryEditorUtils.BetterProp(prop.FindPropertyRelative("smoothingSeconds"), "Smoothing Seconds", tooltip: "It will take approximately this many seconds to smoothly blend to the target depth. Beware that this smoothing is based on framerate, so higher FPS will result in faster smoothing."));
 
+                // FORK: Exit smoothing toggle. Not present in upstream.
+                // Enabling this reveals the slow-close / exit animation sub-options.
                 var useExitSmoothingProp = prop.FindPropertyRelative("useExitSmoothing");
                 c.Add(VRCFuryEditorUtils.BetterProp(useExitSmoothingProp, "Slow Close (Exit Smoothing)?", tooltip: "When enabled, the socket will close slowly after the plug exits, using a separate slower smoother."));
                 c.Add(VRCFuryEditorUtils.RefreshOnChange(() => {
                     if (!useExitSmoothingProp.boolValue) return new VisualElement();
 
                     var exitSection = new VisualElement();
+
+                    // FORK: How long the slow smoother takes to decay to zero after plug exits.
                     exitSection.Add(VRCFuryEditorUtils.BetterProp(
                         prop.FindPropertyRelative("exitSmoothingSeconds"),
                         "Exit Smoothing Seconds",
                         tooltip: "How many seconds it takes to fully close after the plug exits. Start with 2.0."
                     ));
 
+                    // FORK: Optional exit animation toggle.
+                    // Enabling this reveals the clip and fade-out fields.
                     var useExitAnimProp = prop.FindPropertyRelative("useExitAnimation");
                     exitSection.Add(VRCFuryEditorUtils.BetterProp(
                         useExitAnimProp,
                         "Play Exit Animation?",
-                        tooltip: "Plays a smooth animation that rises and falls gradually as the plug exits. Driven by the difference between the fast and slow smoothers — zero while entering, peaks mid-exit, returns to zero when fully closed."
+                        tooltip: "Plays a smooth animation that rises and falls gradually as the plug exits. Driven by the difference between the fast and slow smoothers: zero while entering, peaks mid-exit, returns to zero when fully closed."
                     ));
                     exitSection.Add(VRCFuryEditorUtils.RefreshOnChange(() => {
                         if (!useExitAnimProp.boolValue) return new VisualElement();
                         var animSection = new VisualElement();
+
+                        // FORK: The animation clip/state to play as the plug withdraws.
                         animSection.Add(VRCFuryEditorUtils.BetterProp(
                             prop.FindPropertyRelative("exitActionSet"),
                             "Exit Animation"
                         ));
+
+                        // FORK: Blend-out duration after plug has fully left the socket.
                         animSection.Add(VRCFuryEditorUtils.BetterProp(
                             prop.FindPropertyRelative("exitAnimFadeSeconds"),
                             "Exit Fade Seconds",
@@ -310,6 +340,7 @@ namespace VF.Inspector
                 );
             }
 
+            // FORK: Uses local GetName() instead of upstream's GetMenuName().
             DrawGizmo(transform.TransformPoint(localPosition), transform.worldRotation * localRotation, lightType, GetName(socket), Selection.activeGameObject == socket.owner());
         }
 
@@ -552,6 +583,7 @@ namespace VF.Inspector
         public static bool ShouldProbablyHaveTouchZone(VRCFuryHapticSocket socket)
         {
             if (ClosestBoneUtils.GetClosestHumanoidBone(socket.owner()) != HumanBodyBones.Hips) return false;
+            // FORK: Uses local GetName() instead of upstream's GetMenuName().
             var name = GetName(socket).ToLower();
             if (name.Contains("rubbing") || name.Contains("job")) return false;
             return true;
@@ -564,6 +596,9 @@ namespace VF.Inspector
             return ShouldProbablyHaveTouchZone(socket);
         }
 
+        // FORK: Simplified name resolution. Upstream uses GetMenuName() which calls
+        // HapticUtils.GetPreferredId() with OSC/menu disambiguation. This fork reads
+        // socket.name directly and falls back to HapticUtils.GetName() on the transform.
         public static string GetName(VRCFuryHapticSocket socket)
         {
             var name = socket.name;
