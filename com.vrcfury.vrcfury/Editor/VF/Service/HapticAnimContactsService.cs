@@ -75,23 +75,12 @@ namespace VF.Service
 
                     if (depthAction.useExitAnimation)
                     {
-                        // exitDriver = gap between the slow and fast smoothers.
-                        // While plug is entering or stationary: smoothedFast >= smoothedSlow,
-                        //   so the gap is <= 0, clamped to 0 — exit animation stays inactive.
-                        // While plug is withdrawing: smoothedFast drops quickly while smoothedSlow
-                        //   stays elevated, gap rises proportionally to withdrawal depth — exit
-                        //   animation progresses gradually as the plug leaves.
-                        // If plug stops mid-exit: both smoothers converge, gap holds roughly
-                        //   constant — exit animation pauses/holds at current frame.
-                        // Once plug fully exits: both smoothers decay to 0 together — exit
-                        //   animation fades out.
                         var rawExitDriver = math.Subtract(
                             smoothedSlow,
                             smoothedFast,
                             $"{prefix}/RawExitDriver"
                         );
 
-                        // Clamp to 0..1 (negative values when plug is entering are cut off)
                         var exitDriver = math.Map(
                             $"{prefix}/ExitDriver",
                             rawExitDriver,
@@ -112,19 +101,23 @@ namespace VF.Service
 
                         if (exitAction.useMotionTime)
                         {
+                            // MotionTime clips scrub manually — keep exitDriver for those
                             exitOn.WithAnimation(exitAction.onClip).MotionTime(exitDriver);
                         }
                         else
                         {
-                            var exitTree = VFBlendTree1D.Create($"{prefix}/Exit tree", exitDriver);
-                            exitTree.Add(0, clipFactory.GetEmptyClip());
-                            exitTree.Add(1, exitAction.onClip);
-                            exitOn.WithAnimation(exitTree);
+                            // Play clip forward and hold last frame naturally.
+                            // exitDriver is no longer driving the animation value —
+                            // the state machine hold (smoothedFast condition below)
+                            // keeps the clip alive and Unity holds the last frame.
+                            exitOn.WithAnimation(exitAction.onClip);
                         }
 
+                        // Enter exitOn when plug starts withdrawing (gap opens)
                         var exitWhen = exitDriver.IsGreaterThan(0.01f);
                         exitOff.TransitionsTo(exitOn).When(exitWhen);
-                        exitOn.TransitionsTo(exitOff).When(exitWhen.Not());
+                        // FIX: hold exitOn until plug is fully gone, not until movement stops
+                        exitOn.TransitionsTo(exitOff).When(smoothedFast.IsLessThan(0.01f));
                     }
                 }
                 else
