@@ -121,16 +121,16 @@ namespace VF.Service
                         }
 
                         // Enter exitOn only when plug is withdrawing AND still present.
-                        // The smoothedFast guard prevents re-entry after full exit while
-                        // exitDriver is still open from the decaying slow smoother.
+                        // smoothedFast guard blocks re-entry while exitDriver is still
+                        // open from the decaying slow smoother after full exit.
                         var exitWhen = exitDriver.IsGreaterThan(0.01f).And(smoothedFast.IsGreaterThan(0.01f));
                         exitOff.TransitionsTo(exitOn).When(exitWhen);
 
                         // Leave exitOn when plug is fully gone (fast smoother hits zero).
-                        // Blends out over smoothingSeconds for a brief natural fade.
+                        // Fades out over exitAnimFadeSeconds for a natural blend-out.
                         exitOn.TransitionsTo(exitOff)
                             .When(smoothedFast.IsLessThan(0.005f))
-                            .WithTransitionDurationSeconds(depthAction.smoothingSeconds);
+                            .WithTransitionDurationSeconds(depthAction.exitAnimFadeSeconds);
                     }
                 }
                 else
