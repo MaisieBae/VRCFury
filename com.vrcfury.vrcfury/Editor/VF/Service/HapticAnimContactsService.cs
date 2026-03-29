@@ -75,8 +75,8 @@ namespace VF.Service
 
                     if (depthAction.useExitAnimation)
                     {
-                        // Raw exit driver: positive only when slow smoother is still draining
-                        // after the fast smoother has dropped (i.e., plug is leaving)
+                        // Raw difference: positive only while slow smoother is draining
+                        // after the fast smoother has dropped (plug is leaving)
                         var rawExitDriver = math.Subtract(
                             smoothedSlow,
                             smoothedFast,
@@ -97,9 +97,9 @@ namespace VF.Service
                         // exitDriver is suppressed to 0 while plug is still inside,
                         // and only begins rising once the plug has fully exited
                         var exitDriver = math.Multiply(
+                            $"{prefix}/ExitDriver",
                             rawExitDriver,
-                            plugGone,
-                            $"{prefix}/ExitDriver"
+                            plugGone
                         );
 
                         var exitLayer = fx.NewLayer($"{layerName} - {actionNum} - Exit");
