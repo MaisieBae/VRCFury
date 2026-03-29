@@ -75,31 +75,28 @@ namespace VF.Service
 
                     if (depthAction.useExitAnimation)
                     {
-                        // Raw difference: positive only while slow smoother is draining
-                        // after the fast smoother has dropped (plug is leaving)
+                        // exitDriver = gap between the slow and fast smoothers.
+                        // While plug is entering or stationary: smoothedFast >= smoothedSlow,
+                        //   so the gap is <= 0, clamped to 0 — exit animation stays inactive.
+                        // While plug is withdrawing: smoothedFast drops quickly while smoothedSlow
+                        //   stays elevated, gap rises proportionally to withdrawal depth — exit
+                        //   animation progresses gradually as the plug leaves.
+                        // If plug stops mid-exit: both smoothers converge, gap holds roughly
+                        //   constant — exit animation pauses/holds at current frame.
+                        // Once plug fully exits: both smoothers decay to 0 together — exit
+                        //   animation fades out.
                         var rawExitDriver = math.Subtract(
                             smoothedSlow,
                             smoothedFast,
                             $"{prefix}/RawExitDriver"
                         );
 
-                        // Gate: 0 while plug is still partially inside (smoothedFast > 0),
-                        // ramps to 1 only once smoothedFast has returned to zero.
-                        // This makes the exit animation hold while any part of the plug
-                        // is still registering, mirroring how the depth animation holds during entry.
-                        var plugGone = math.Map(
-                            $"{prefix}/PlugGone",
-                            smoothedFast,
-                            0.01f, 0f,
-                            0f, 1f
-                        );
-
-                        // exitDriver is suppressed to 0 while plug is still inside,
-                        // and only begins rising once the plug has fully exited
-                        var exitDriver = math.Multiply(
+                        // Clamp to 0..1 (negative values when plug is entering are cut off)
+                        var exitDriver = math.Map(
                             $"{prefix}/ExitDriver",
                             rawExitDriver,
-                            plugGone
+                            0f, 1f,
+                            0f, 1f
                         );
 
                         var exitLayer = fx.NewLayer($"{layerName} - {actionNum} - Exit");
