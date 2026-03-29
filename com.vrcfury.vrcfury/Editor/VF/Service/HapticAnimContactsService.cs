@@ -8,9 +8,6 @@ using VF.Utils.Controller;
 
 namespace VF.Service
 {
-    /**
-     * This can build the contacts needed for haptic component depth animations
-     */
     [VFService]
     internal class HapticAnimContactsService
     {
@@ -75,16 +72,28 @@ namespace VF.Service
 
                     if (depthAction.useExitAnimation)
                     {
+                        // Gap signal — doorman only.
+                        // Opens when smoothedFast drops below smoothedSlow (plug withdrawing).
+                        // Used exclusively to trigger entry into exitOn.
                         var rawExitDriver = math.Subtract(
                             smoothedSlow,
                             smoothedFast,
                             $"{prefix}/RawExitDriver"
                         );
-
                         var exitDriver = math.Map(
                             $"{prefix}/ExitDriver",
                             rawExitDriver,
                             0f, 1f,
+                            0f, 1f
+                        );
+
+                        // Positional exit value — inverted depth.
+                        // 0 = plug fully inside, 1 = plug at socket entrance.
+                        // Holds when plug stops, reverses when plug re-enters.
+                        var exitAnimValue = math.Map(
+                            $"{prefix}/ExitAnimValue",
+                            smoothedFast,
+                            1f, 0f,
                             0f, 1f
                         );
 
@@ -101,23 +110,27 @@ namespace VF.Service
 
                         if (exitAction.useMotionTime)
                         {
-                            // MotionTime clips scrub manually — keep exitDriver for those
-                            exitOn.WithAnimation(exitAction.onClip).MotionTime(exitDriver);
+                            exitOn.WithAnimation(exitAction.onClip).MotionTime(exitAnimValue);
                         }
                         else
                         {
-                            // Play clip forward and hold last frame naturally.
-                            // exitDriver is no longer driving the animation value —
-                            // the state machine hold (smoothedFast condition below)
-                            // keeps the clip alive and Unity holds the last frame.
-                            exitOn.WithAnimation(exitAction.onClip);
+                            var exitTree = VFBlendTree1D.Create($"{prefix}/Exit tree", exitAnimValue);
+                            exitTree.Add(0, clipFactory.GetEmptyClip());
+                            exitTree.Add(1, exitAction.onClip);
+                            exitOn.WithAnimation(exitTree);
                         }
 
-                        // Enter exitOn when plug starts withdrawing (gap opens)
-                        var exitWhen = exitDriver.IsGreaterThan(0.01f);
+                        // Enter exitOn only when plug is withdrawing AND still present.
+                        // The smoothedFast guard prevents re-entry after full exit while
+                        // exitDriver is still open from the decaying slow smoother.
+                        var exitWhen = exitDriver.IsGreaterThan(0.01f).And(smoothedFast.IsGreaterThan(0.01f));
                         exitOff.TransitionsTo(exitOn).When(exitWhen);
-                        // FIX: hold exitOn until plug is fully gone, not until movement stops
-                        exitOn.TransitionsTo(exitOff).When(smoothedFast.IsLessThan(0.01f));
+
+                        // Leave exitOn when plug is fully gone (fast smoother hits zero).
+                        // Blends out over smoothingSeconds for a brief natural fade.
+                        exitOn.TransitionsTo(exitOff)
+                            .When(smoothedFast.IsLessThan(0.005f))
+                            .WithTransitionDurationSeconds(depthAction.smoothingSeconds);
                     }
                 }
                 else
