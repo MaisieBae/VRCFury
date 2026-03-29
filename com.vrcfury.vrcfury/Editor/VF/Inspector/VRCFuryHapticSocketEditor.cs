@@ -161,10 +161,17 @@ namespace VF.Inspector
                     ));
                     exitSection.Add(VRCFuryEditorUtils.RefreshOnChange(() => {
                         if (!useExitAnimProp.boolValue) return new VisualElement();
-                        return VRCFuryEditorUtils.BetterProp(
+                        var animSection = new VisualElement();
+                        animSection.Add(VRCFuryEditorUtils.BetterProp(
                             prop.FindPropertyRelative("exitActionSet"),
                             "Exit Animation"
-                        );
+                        ));
+                        animSection.Add(VRCFuryEditorUtils.BetterProp(
+                            prop.FindPropertyRelative("exitAnimFadeSeconds"),
+                            "Exit Fade Seconds",
+                            tooltip: "How many seconds the exit animation takes to fade back to zero after the plug has fully left the socket. 0.5 is a good starting point."
+                        ));
+                        return animSection;
                     }, useExitAnimProp));
 
                     return exitSection;
