@@ -75,11 +75,30 @@ namespace VF.Service
 
                     if (depthAction.useExitAnimation)
                     {
-                        // Smooth diff is 0 while entering/inside, rises and falls
-                        // gradually only during exit — no gating, no snapping
-                        var exitDriver = math.Subtract(
+                        // Raw exit driver: positive only when slow smoother is still draining
+                        // after the fast smoother has dropped (i.e., plug is leaving)
+                        var rawExitDriver = math.Subtract(
                             smoothedSlow,
                             smoothedFast,
+                            $"{prefix}/RawExitDriver"
+                        );
+
+                        // Gate: 0 while plug is still partially inside (smoothedFast > 0),
+                        // ramps to 1 only once smoothedFast has returned to zero.
+                        // This makes the exit animation hold while any part of the plug
+                        // is still registering, mirroring how the depth animation holds during entry.
+                        var plugGone = math.Map(
+                            $"{prefix}/PlugGone",
+                            smoothedFast,
+                            0.01f, 0f,
+                            0f, 1f
+                        );
+
+                        // exitDriver is suppressed to 0 while plug is still inside,
+                        // and only begins rising once the plug has fully exited
+                        var exitDriver = math.Multiply(
+                            rawExitDriver,
+                            plugGone,
                             $"{prefix}/ExitDriver"
                         );
 
